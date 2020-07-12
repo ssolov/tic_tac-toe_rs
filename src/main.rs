@@ -1,6 +1,7 @@
 use std::cmp;
 use std::io;
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(PartialEq)]
 #[derive(Copy, Clone)]
@@ -8,20 +9,6 @@ enum BoardChar {
     O,
     X,
     Empty,
-}
-
-trait ToChar {
-    fn to_char(&self) -> char;
-}
-
-impl ToChar for BoardChar {
-    fn to_char(&self) -> char {
-        match *self {
-            BoardChar::Empty => ' ',
-            BoardChar::O => 'O',
-            BoardChar::X => 'X'
-        }
-    }
 }
 
 trait Opposite {
@@ -35,6 +22,37 @@ impl Opposite for BoardChar {
             BoardChar::O => BoardChar::X,
             BoardChar::X => BoardChar::O
         }        
+    }
+}
+
+impl fmt::Display for BoardChar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            BoardChar::Empty => write!(f, " "),
+            BoardChar::O => write!(f, "O"),
+            BoardChar::X => write!(f, "X"),
+        }
+    }
+}
+
+impl FromStr for BoardChar {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let tr = s.trim();
+        if tr.len() > 1 {
+            return Err(format!("Input {} too lang", tr));
+        }
+
+        if let Some(c) = tr.chars().next() {
+            match c {
+                'X' | 'x' => return Ok(BoardChar::X),
+                'O' | 'o' => return Ok(BoardChar::O),
+                _ => return Err(format!("'{}' is not one of 'X', 'x', 'O', 'o'", c)),
+            }
+        }
+
+        Err(format!("Could not parse: {}", tr))
     }
 }
 
@@ -57,181 +75,19 @@ impl fmt::Display for Move {
     }
 }
 
-type Board = [[BoardChar; 3]; 3];
+impl FromStr for Move {
+    type Err = String;
 
-trait BoardMoves {
-    /// This function returns true if there are moves remaining on the board. 
-    /// It returns false if there are no moves left to play. 
-    fn has_moves(&self) -> bool;
-    fn move_char(&mut self, m: &Move, c: BoardChar);
-    fn evaluate(&self) -> Option<BoardChar>;
-    fn find_best_move(&mut self, c: BoardChar) -> Option<Move>;
-}
-
-impl BoardMoves for Board {
-    fn has_moves(&self) -> bool { 
-        for row in 0..3 {
-            for col in 0..3 {
-                if self[row][col] == BoardChar::Empty {
-                    return true;
-                } 
-            }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let tr = s.trim();
+        if tr.len() != 2 {
+            return Err(format!("Input {} too lang", tr));
         }
 
-        false
-    }
-
-    fn move_char(&mut self, m: &Move, c: BoardChar) {
-        self[m.row][m.col] = c
-    }
-
-    fn evaluate(&self) -> Option<BoardChar> { 
-        // Checking for Rows for X or O victory. 
-        for row in 0..3 {
-            if self[row][0] != BoardChar::Empty && self[row][0] == self[row][1] && self[row][1] == self[row][2] { 
-                return Some(self[row][0]);
-            } 
-        } 
-      
-        // Checking for Columns for X or O victory. 
-        for col in 0..3 {
-            if self[0][col] != BoardChar::Empty && self[0][col] == self[1][col] && self[1][col] == self[2][col] { 
-                return Some(self[0][col]); 
-            } 
-        } 
-      
-        // Checking for Diagonals for X or O victory. 
-        if self[0][0] != BoardChar::Empty && self[0][0] == self[1][1] && self[1][1] == self[2][2] {
-            return Some(self[0][0]);
-        } 
-      
-        if self[0][2] != BoardChar::Empty && self[0][2] == self[1][1] && self[1][1] == self[2][0] {
-            return Some(self[0][2]);
-        } 
-      
-        if self.has_moves() {
-            return Some(BoardChar::Empty);
-        }
-
-        // Else if none of them have won and no free moves
-        None
-    }
-
-    fn find_best_move(&mut self, c: BoardChar) -> Option<Move> {
-        let mut best_val = -10; 
-        let mut best_move = None;
-      
-        // Traverse all cells, evaluate minimax function for 
-        // all empty cells. And return the cell with optimal 
-        // value. 
-        for i in 0..3 { 
-            for j in 0..3 { 
-                // Check if cell is empty 
-                if self[i][j] == BoardChar::Empty { 
-                    // Make the move 
-                    let m = Move{row: i, col: j};
-                    self.move_char(&m, c);
-      
-                    // compute evaluation function for this move. 
-                    let move_val = minimax(self, c.to_opposite()); 
- 
-                    // If the value of the current move is 
-                    // more than the best value, then update 
-                    // best/ 
-                    if move_val > best_val { 
-                        best_move = Some(Move {row: i, col: j}); 
-                        best_val = move_val; 
-                    } 
-
-                    // Undo the move 
-                    self[i][j] = BoardChar::Empty;
-                } 
-            } 
-        } 
-      
-        best_move
-    }
-}
-
-trait PrintBoard {
-    /// Prints entire Board.
-    fn print(&self);
-    /// Prints the row of the Board by row number.
-    fn print_row(&self, nr: usize);
-}
-
-impl PrintBoard for Board {
-    fn print(&self) {
-        println!("  A B C\n \u{250C}\u{2500}\u{252C}\u{2500}\u{252C}\u{2500}\u{2510}");
-        
-        self.print_row(0);
-        println!("\n \u{251C}\u{2500}\u{253C}\u{2500}\u{253C}\u{2500}\u{2524}");
-
-        self.print_row(1);
-        println!("\n \u{251C}\u{2500}\u{253C}\u{2500}\u{253C}\u{2500}\u{2524}");
-
-        self.print_row(2);
-        println!("\n \u{2514}\u{2500}\u{2534}\u{2500}\u{2534}\u{2500}\u{2518}\n");
-    }
-
-    fn print_row(&self, nr: usize) {
-        print!("{}\u{2502}", nr + 1);
-
-        for row in &self[nr] {
-            print!("{}\u{2502}", row.to_char());
-        }
-    }
-}
-
-// This is the minimax function. It considers all the possible ways 
-// the game can go and returns the value of the board 
-fn minimax(b: &mut Board, c: BoardChar) -> i16 { 
-    match b.evaluate() {
-        Some(BoardChar::X) => return 1, // If Maximizer has won the game return his/her evaluated score 
-        Some(BoardChar::O) => return -1, // If Minimizer has won the game return his/her evaluated score 
-        None => return 0,
-        _ => ()
-    }
-  
-    let mut best: i16 = if c == BoardChar::X {
-        // If this maximizer's move
-        -10
-    } else {
-        // If this minimizer's move 
-        10
-    };
-
-    for i in 0..3 { 
-        for j in 0..3 { 
-            // Check if cell is empty 
-            if b[i][j] == BoardChar::Empty { 
-                // Make the move 
-                let m = Move{row: i, col: j};
-                b.move_char(&m, c);
-
-                if c == BoardChar::X {
-                    // Call minimax recursively and choose the maximum value 
-                    best = cmp::max(best, minimax(b, c.to_opposite())); 
-                } else {
-                    // Call minimax recursively and choose the minimum value 
-                    best = cmp::min(best, minimax(b, c.to_opposite())); 
-                }
-  
-                // Undo the move 
-                b.move_char(&m, BoardChar::Empty); 
-            } 
-        } 
-    } 
-    
-    best
-}
-
-fn input_to_move(inp: &str) -> Option<Move> {
-    if inp.len() == 2 {
-       let mut col: Option<usize> = None;
-       let mut row: Option<usize> = None;
-
-       for c in inp.chars() {
+        let mut col: Option<usize> = None;
+        let mut row: Option<usize> = None;
+     
+        for c in tr.chars() {
             match c {
                 'A' | 'a' => col = Some(0),
                 'B' | 'b' => col = Some(1),
@@ -242,46 +98,259 @@ fn input_to_move(inp: &str) -> Option<Move> {
                 _ => (),
             }
         }
-
+     
         if row.is_some() && col.is_some() {
-            return Some(Move {row: row.unwrap(), col: col.unwrap()});
+            return Ok(Move {row: row.unwrap(), col: col.unwrap()});
         }
+
+        Err(format!("Could not parse: {}", tr))
+    }
+}
+
+type Board = [[BoardChar; 3]; 3];
+
+struct TicTacToe {
+    board: Board,
+    player_char: BoardChar,
+    machine_char: BoardChar,
+}
+
+fn create_tick_tac_toe(player_char: BoardChar) -> TicTacToe {
+    TicTacToe {
+        board: [[BoardChar::Empty; 3]; 3],
+        player_char,
+        machine_char: player_char.to_opposite(),
+    }
+}
+
+trait BoardMoves {
+    /// This function returns true if there are moves remaining on the board. 
+    /// It returns false if there are no moves left to play. 
+    fn has_moves(&self) -> bool;
+    /// This function makes the player's move
+    fn player_move(&mut self, m: &Move);
+    /// This function makes the machin's move
+    fn machine_move(&mut self, m: &Move);
+    /// This function returns true if player won
+    fn player_evaluate(&self) -> bool;
+    /// This function returns true if machine won
+    fn machine_evaluate(&self) -> bool;
+    /// This function will return the best possible move for machine
+    fn find_best_move(&mut self) -> Option<Move>;
+}
+
+impl BoardMoves for TicTacToe {
+    fn has_moves(&self) -> bool { 
+        for row in 0..3 {
+            for col in 0..3 {
+                if self.board[row][col] == BoardChar::Empty {
+                    return true;
+                } 
+            }
+        }
+
+        false
     }
 
-    None
+    fn player_move(&mut self, m: &Move) {
+        self.board[m.row][m.col] = self.player_char
+    }
+
+    fn machine_move(&mut self, m: &Move) {
+        self.board[m.row][m.col] = self.machine_char
+    }
+
+    fn player_evaluate(&self) -> bool { 
+        evaluate(&self.board, self.player_char)
+    }
+
+    fn machine_evaluate(&self) -> bool { 
+        evaluate(&self.board, self.machine_char)
+    }
+
+    fn find_best_move(&mut self) -> Option<Move> {
+        let mut best_val = -10;
+        let mut best_move = None;
+      
+        // Traverse all cells, evaluate minimax function for all empty cells. 
+        // And return the cell with optimal value. 
+        for i in 0..3 { 
+            for j in 0..3 { 
+                // Check if cell is empty 
+                if self.board[i][j] == BoardChar::Empty { 
+                    // Make the move 
+                    self.board[i][j] = self.machine_char;
+                    // compute evaluation function for this move. 
+                    let move_val = minimax(self, self.player_char); 
+                    // If the move_value is more than the best_val, then update best_val
+                    if move_val > best_val { 
+                        best_move = Some(Move {row: i, col: j}); 
+                        best_val = move_val; 
+                    } 
+
+                    // undo the move 
+                    self.board[i][j] = BoardChar::Empty;
+                } 
+            } 
+        } 
+      
+        best_move
+    }
+}
+
+impl fmt::Display for TicTacToe {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut board_txt = format!("  A B C\n \u{250C}\u{2500}\u{252C}\u{2500}\u{252C}\u{2500}\u{2510}\n{}\u{2502}", 1);
+
+        for row in &self.board[0] {
+            board_txt.push_str(&format!("{}\u{2502}", row));
+        }
+        
+        board_txt.push_str(&format!("\n \u{251C}\u{2500}\u{253C}\u{2500}\u{253C}\u{2500}\u{2524}\n{}\u{2502}", 2));
+
+        for row in &self.board[1] {
+            board_txt.push_str(&format!("{}\u{2502}", row));
+        }
+        
+        board_txt.push_str(&format!("\n \u{251C}\u{2500}\u{253C}\u{2500}\u{253C}\u{2500}\u{2524}\n{}\u{2502}", 3));
+
+        for row in &self.board[2] {
+            board_txt.push_str(&format!("{}\u{2502}", row));
+        }
+
+        writeln!(f, "{}\n \u{2514}\u{2500}\u{2534}\u{2500}\u{2534}\u{2500}\u{2518}\n", board_txt)
+    }
+}
+
+fn evaluate(b: &Board, c: BoardChar) -> bool { 
+    // Checking for Rows for X or O victory. 
+    for row in 0..3 {
+        if b[row][0] == c && b[row][0] == b[row][1] && b[row][1] == b[row][2] { 
+            return true;
+        } 
+    } 
+  
+    // Checking for Columns for X or O victory. 
+    for col in 0..3 {
+        if b[0][col] == c && b[0][col] == b[1][col] && b[1][col] == b[2][col] { 
+            return true; 
+        } 
+    } 
+  
+    // Checking for Diagonals for X or O victory. 
+    if b[0][0] == c && b[0][0] == b[1][1] && b[1][1] == b[2][2] {
+        return true;
+    } 
+  
+    if b[0][2] == c && b[0][2] == b[1][1] && b[1][1] == b[2][0] {
+        return true;
+    } 
+  
+    // Else if none of them have won
+    false
+}
+
+// This is the minimax function. It considers all the possible ways 
+// the game can go and returns the value of the board 
+fn minimax(ttt: &mut TicTacToe, c: BoardChar) -> i16 {  
+    // If Machine has won the game return his/her evaluated score 
+    if ttt.machine_evaluate() {
+        return 1
+    }
+
+    // If Player has won the game return his/her evaluated score 
+    if ttt.player_evaluate() {
+        return -1
+    }
+
+    if !ttt.has_moves() {
+        return 0
+    }
+
+    let mut best: i16 = if c == ttt.machine_char {
+        // If this maximizer's move
+        -10
+    } else {
+        // If this minimizer's move 
+        10
+    };
+
+    for i in 0..3 { 
+        for j in 0..3 { 
+            // check if cell is empty 
+            if ttt.board[i][j] == BoardChar::Empty { 
+                // make the move 
+                let m = Move{row: i, col: j};
+                ttt.board[i][j] = c;
+                println!("char: {}, move: {}, best: {}", c, m, best);
+
+                // call minimax recursively
+                let next_best = minimax(ttt, c.to_opposite());
+
+                if c == ttt.machine_char {
+                    // choose the maximum value 
+                    best = cmp::max(best, next_best); 
+                } else {
+                    // choose the minimum value 
+                    best = cmp::min(best, next_best); 
+                }
+  
+                // undo the move 
+                ttt.board[i][j] = BoardChar::Empty; 
+            } 
+        } 
+    } 
+    
+    best
+}
+
+/// This is a generic function to convert terminal input in some type
+fn read_input<T: FromStr<Err=String>>(ask: &str) -> T {
+    println!("{}", ask);
+
+    let mut input = String::new();
+    match io::stdin().read_line(&mut input) {
+        Ok(_) => {
+            match T::from_str(&input) {
+                Ok(bc) => return bc,
+                Err(e) => {
+                    println!("{}", e);
+                    return read_input::<T>(ask);
+                }
+            }
+        },
+
+        Err(error) => panic!(error),
+    }
 }
 
 fn main() {
-    let mut b: Board = [[BoardChar::Empty; 3]; 3]; 
-    b.print();
+    let bc = read_input("Please choose a symbol: X or O");
+    let mut b = create_tick_tac_toe(bc); 
+    println!("{}", b);
 
-    while let Some(BoardChar::Empty) = b.evaluate() {
-        println!("your move: ");
+    while b.has_moves() 
+            && !b.player_evaluate() 
+            && !b.machine_evaluate() {
 
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
-                if let Some(m) = input_to_move(input.trim()) {
-                    b.move_char(&m, BoardChar::O);
-                    b.print();
-                    // if let Some(BoardChar::O) = b.evaluate() {
-                    //     break;
-                    // }
 
-                    if let Some(m) = b.find_best_move(BoardChar::X) {
-                        b.move_char(&m, BoardChar::X);
-                        println!("machine moved: {}", m);
-                        b.print();
-                    }
-                }
-            },
-            Err(error) => panic!(error),
+        let m = read_input("your move: ");
+        b.player_move(&m);
+
+        if let Some(m) = b.find_best_move() {
+            b.machine_move(&m);
+            println!("machine moved: {}", m);
         }
+
+        println!("{}", b);
     }
 
-    match b.evaluate() {
-        Some(c) => println!("won: {}", c.to_char()),
-        None => println!("draw"),
+    if b.player_evaluate() {
+        println!("Congratulations, you won!");
+    } else if b.machine_evaluate() {
+        println!("Sorry, but you lost");
+    } else {
+        println!("Draw");
     }
 }
     
