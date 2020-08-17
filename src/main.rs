@@ -113,15 +113,15 @@ struct TicTacToe {
     machine_char: BoardChar,
 }
 
-fn create_tick_tac_toe(player_char: BoardChar) -> TicTacToe {
-    TicTacToe {
-        board: [[BoardChar::Empty; 3]; 3],
-        player_char,
-        machine_char: player_char.to_opposite(),
-    }
-}
-
 impl TicTacToe {
+    fn new(player_char: BoardChar) -> TicTacToe {
+        TicTacToe {
+            board: [[BoardChar::Empty; 3]; 3],
+            player_char,
+            machine_char: player_char.to_opposite(),
+        }
+    }
+
     /// This function returns true if there are moves remaining on the board.
     /// It returns false if there are no moves left to play.    
     fn has_moves(&self) -> bool {
@@ -136,20 +136,30 @@ impl TicTacToe {
         false
     }
     /// This function makes the player's move
-    fn player_move(&mut self, m: &Move) {
-        self.board[m.row][m.col] = self.player_char
+    fn player_move(&mut self, m: &Move) -> bool {
+        self.do_move(m, self.player_char)
     }
     /// This function makes the machin's move
-    fn machine_move(&mut self, m: &Move) {
-        self.board[m.row][m.col] = self.machine_char
+    fn machine_move(&mut self, m: &Move) -> bool {
+        self.do_move(m, self.machine_char)
+    }
+
+    fn do_move(&mut self, m: &Move, c: BoardChar) -> bool {
+        if self.board[m.row][m.col] == BoardChar::Empty {
+            self.board[m.row][m.col] = c;
+
+            return true
+        }
+        
+        false
     }
     /// This function returns true if player won
     fn player_evaluate(&self) -> bool {
-        evaluate(&self.board, self.player_char)
+        self.evaluate(self.player_char)
     }
     /// This function returns true if machine won
     fn machine_evaluate(&self) -> bool {
-        evaluate(&self.board, self.machine_char)
+        self.evaluate(self.machine_char)
     }
     /// This function will return the best possible move for machine
     fn find_best_move(&mut self) -> Option<Move> {
@@ -165,7 +175,7 @@ impl TicTacToe {
                     // Make the move
                     self.board[i][j] = self.machine_char;
                     // compute evaluation function for this move.
-                    let move_val = minimax(self, self.player_char);
+                    let move_val = self.minimax(self.player_char);
                     // If the move_value is more than the best_val, then update best_val
                     if move_val > best_val {
                         best_move = Some(Move { row: i, col: j });
@@ -179,6 +189,86 @@ impl TicTacToe {
         }
 
         best_move
+    }
+
+    fn evaluate(&self, c: BoardChar) -> bool {
+        // Checking for Rows for X or O victory.
+        for row in 0..3 {
+            if self.board[row][0] == c && self.board[row][0] == self.board[row][1] && self.board[row][1] == self.board[row][2] {
+                return true;
+            }
+        }
+    
+        // Checking for Columns for X or O victory.
+        for col in 0..3 {
+            if self.board[0][col] == c && self.board[0][col] == self.board[1][col] && self.board[1][col] == self.board[2][col] {
+                return true;
+            }
+        }
+    
+        // Checking for Diagonals for X or O victory.
+        if self.board[0][0] == c && self.board[0][0] == self.board[1][1] && self.board[1][1] == self.board[2][2] {
+            return true;
+        }
+    
+        if self.board[0][2] == c && self.board[0][2] == self.board[1][1] && self.board[1][1] == self.board[2][0] {
+            return true;
+        }
+    
+        // Else if none of them have won
+        false
+    }
+
+    // This is the minimax function. It considers all the possible ways
+    // the game can go and returns the value of the board
+    fn minimax(&mut self, c: BoardChar) -> i16 {
+        // If Machine has won the game return his/her evaluated score
+        if self.machine_evaluate() {
+            return 1;
+        }
+
+        // If Player has won the game return his/her evaluated score
+        if self.player_evaluate() {
+            return -1;
+        }
+
+        if !self.has_moves() {
+            return 0;
+        }
+
+        let mut best: i16 = if c == self.machine_char {
+            // If this maximizer's move
+            -10
+        } else {
+            // If this minimizer's move
+            10
+        };
+
+        for i in 0..3 {
+            for j in 0..3 {
+                // check if cell is empty
+                if self.board[i][j] == BoardChar::Empty {
+                    // make the move
+                    self.board[i][j] = c;
+
+                    // call minimax recursively
+                    let next_best = self.minimax(c.to_opposite());
+
+                    if c == self.machine_char {
+                        // choose the maximum value
+                        best = cmp::max(best, next_best);
+                    } else {
+                        // choose the minimum value
+                        best = cmp::min(best, next_best);
+                    }
+
+                    // undo the move
+                    self.board[i][j] = BoardChar::Empty;
+                }
+            }
+        }
+
+        best
     }
 }
 
@@ -219,86 +309,6 @@ impl fmt::Display for TicTacToe {
     }
 }
 
-fn evaluate(b: &Board, c: BoardChar) -> bool {
-    // Checking for Rows for X or O victory.
-    for row in 0..3 {
-        if b[row][0] == c && b[row][0] == b[row][1] && b[row][1] == b[row][2] {
-            return true;
-        }
-    }
-
-    // Checking for Columns for X or O victory.
-    for col in 0..3 {
-        if b[0][col] == c && b[0][col] == b[1][col] && b[1][col] == b[2][col] {
-            return true;
-        }
-    }
-
-    // Checking for Diagonals for X or O victory.
-    if b[0][0] == c && b[0][0] == b[1][1] && b[1][1] == b[2][2] {
-        return true;
-    }
-
-    if b[0][2] == c && b[0][2] == b[1][1] && b[1][1] == b[2][0] {
-        return true;
-    }
-
-    // Else if none of them have won
-    false
-}
-
-// This is the minimax function. It considers all the possible ways
-// the game can go and returns the value of the board
-fn minimax(ttt: &mut TicTacToe, c: BoardChar) -> i16 {
-    // If Machine has won the game return his/her evaluated score
-    if ttt.machine_evaluate() {
-        return 1;
-    }
-
-    // If Player has won the game return his/her evaluated score
-    if ttt.player_evaluate() {
-        return -1;
-    }
-
-    if !ttt.has_moves() {
-        return 0;
-    }
-
-    let mut best: i16 = if c == ttt.machine_char {
-        // If this maximizer's move
-        -10
-    } else {
-        // If this minimizer's move
-        10
-    };
-
-    for i in 0..3 {
-        for j in 0..3 {
-            // check if cell is empty
-            if ttt.board[i][j] == BoardChar::Empty {
-                // make the move
-                ttt.board[i][j] = c;
-
-                // call minimax recursively
-                let next_best = minimax(ttt, c.to_opposite());
-
-                if c == ttt.machine_char {
-                    // choose the maximum value
-                    best = cmp::max(best, next_best);
-                } else {
-                    // choose the minimum value
-                    best = cmp::min(best, next_best);
-                }
-
-                // undo the move
-                ttt.board[i][j] = BoardChar::Empty;
-            }
-        }
-    }
-
-    best
-}
-
 /// This is a generic function to convert terminal input in some type
 fn read_input<T: FromStr<Err = String>>(ask: &str) -> T {
     println!("{}", ask);
@@ -319,24 +329,28 @@ fn read_input<T: FromStr<Err = String>>(ask: &str) -> T {
 
 fn main() {
     let bc = read_input("Please choose a symbol: X or O");
-    let mut b = create_tick_tac_toe(bc);
-    println!("{}", b);
+    let mut game = TicTacToe::new(bc);
+    
+    while game.has_moves() && !game.player_evaluate() && !game.machine_evaluate() {
+        println!("{}", game);
 
-    while b.has_moves() && !b.player_evaluate() && !b.machine_evaluate() {
-        let m = read_input("your move: ");
-        b.player_move(&m);
-
-        if let Some(m) = b.find_best_move() {
-            b.machine_move(&m);
-            println!("machine moved: {}", m);
+        let m = read_input("your turn: ");
+        if !game.player_move(&m) {
+            println!("This move is not possible, the cell is already occupied");
+            continue;
         }
 
-        println!("{}", b);
+        if let Some(m) = game.find_best_move() {
+            game.machine_move(&m);
+            println!("machine moved to: {}", m);
+        }
     }
 
-    if b.player_evaluate() {
+    println!("{}", game);
+    
+    if game.player_evaluate() {
         println!("Congratulations, you won!");
-    } else if b.machine_evaluate() {
+    } else if game.machine_evaluate() {
         println!("Sorry, but you lost");
     } else {
         println!("Draw");
