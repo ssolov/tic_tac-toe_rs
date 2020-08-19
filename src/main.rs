@@ -122,6 +122,10 @@ impl TicTacToe {
         }
     }
 
+    /// This function returns true if game is over
+    fn is_game_over(&self) -> bool {
+        !self.has_moves() || self.player_won() || self.machine_won()
+    }
     /// This function returns true if there are moves remaining on the board.
     /// It returns false if there are no moves left to play.    
     fn has_moves(&self) -> bool {
@@ -140,8 +144,14 @@ impl TicTacToe {
         self.do_move(m, self.player_char)
     }
     /// This function makes the machin's move
-    fn machine_move(&mut self, m: &Move) -> bool {
-        self.do_move(m, self.machine_char)
+    fn machine_move(&mut self) -> Option<Move> {
+        if let Some(m) = self.find_best_move() {
+            self.do_move(&m, self.machine_char);
+
+            return Some(m)
+        }
+        
+        None
     }
 
     fn do_move(&mut self, m: &Move, c: BoardChar) -> bool {
@@ -154,11 +164,11 @@ impl TicTacToe {
         false
     }
     /// This function returns true if player won
-    fn player_evaluate(&self) -> bool {
+    fn player_won(&self) -> bool {
         self.evaluate(self.player_char)
     }
     /// This function returns true if machine won
-    fn machine_evaluate(&self) -> bool {
+    fn machine_won(&self) -> bool {
         self.evaluate(self.machine_char)
     }
     /// This function will return the best possible move for machine
@@ -223,12 +233,12 @@ impl TicTacToe {
     // the game can go and returns the value of the board
     fn minimax(&mut self, c: BoardChar) -> i16 {
         // If Machine has won the game return his/her evaluated score
-        if self.machine_evaluate() {
+        if self.machine_won() {
             return 1;
         }
 
         // If Player has won the game return his/her evaluated score
-        if self.player_evaluate() {
+        if self.player_won() {
             return -1;
         }
 
@@ -331,7 +341,7 @@ fn main() {
     let bc = read_input("Please choose a symbol: X or O");
     let mut game = TicTacToe::new(bc);
     
-    while game.has_moves() && !game.player_evaluate() && !game.machine_evaluate() {
+    while !game.is_game_over() {
         println!("{}", game);
 
         let m = read_input("your turn: ");
@@ -340,17 +350,16 @@ fn main() {
             continue;
         }
 
-        if let Some(m) = game.find_best_move() {
-            game.machine_move(&m);
+        if let Some(m) = game.machine_move() {
             println!("machine moved to: {}", m);
         }
     }
 
     println!("{}", game);
     
-    if game.player_evaluate() {
+    if game.player_won() {
         println!("Congratulations, you won!");
-    } else if game.machine_evaluate() {
+    } else if game.machine_won() {
         println!("Sorry, but you lost");
     } else {
         println!("Draw");
